@@ -22,7 +22,7 @@
         
         label { font-weight: 500; margin-bottom: 5px; font-size: 0.9rem; }
         
-        select, input[type="text"], input[type="number"], input[type="time"], input[type="date"], textarea {
+        select, input[type="text"], input[type="number"], input[type="date"], textarea {
             padding: 10px 12px;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -33,7 +33,28 @@
 
         .km-display { background: #e9ecef !important; font-weight: bold !important; text-align: center !important; }
         
-        .time-input-group { display: flex; gap: 5px; }
+        /* 24시간제 시/분 선택 그룹 */
+        .time24-input-group { display: flex; align-items: center; gap: 6px; }
+        .time24-select {
+            flex: 1 1 0;
+            min-width: 0;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .time24-colon { font-weight: bold; font-size: 1.1rem; color: #555; }
+        .time24-input-group .btn-secondary { flex-shrink: 0; }
+        .time-format-badge {
+            display: inline-block;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #007bff;
+            background: #e7f1ff;
+            border: 1px solid #b6d4fe;
+            border-radius: 3px;
+            padding: 1px 6px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
         
         .btn { padding: 10px 15px; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; }
         .btn-success { background: #28a745; color: white; width: 100%; padding: 12px; margin-top: 10px; }
@@ -192,7 +213,7 @@
             </div>
 
             <div class="form-card">
-                <h2 class="section-title">⏰ 시간 및 거리</h2>
+                <h2 class="section-title">⏰ 시간 및 거리 <span class="time-format-badge">24시간제</span></h2>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="tripDate">운행 날짜</label>
@@ -201,16 +222,20 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="departureTime">출발시각</label>
-                        <div class="time-input-group">
-                            <input type="time" id="departureTime" name="departureTime" required style="flex-grow: 1;">
+                        <label id="departureLabel">출발시각 (00~23시)</label>
+                        <div class="time24-input-group">
+                            <select id="departureHour" class="time24-select" required aria-labelledby="departureLabel"></select>
+                            <span class="time24-colon">:</span>
+                            <select id="departureMinute" class="time24-select" required aria-labelledby="departureLabel"></select>
                             <button type="button" class="btn btn-secondary" id="setDepartureTimeBtn" title="현재 시각으로 설정">⏰</button>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="arrivalTime">도착시각</label>
-                        <div class="time-input-group">
-                            <input type="time" id="arrivalTime" name="arrivalTime" required style="flex-grow: 1;">
+                        <label id="arrivalLabel">도착시각 (00~23시)</label>
+                        <div class="time24-input-group">
+                            <select id="arrivalHour" class="time24-select" required aria-labelledby="arrivalLabel"></select>
+                            <span class="time24-colon">:</span>
+                            <select id="arrivalMinute" class="time24-select" required aria-labelledby="arrivalLabel"></select>
                             <button type="button" class="btn btn-secondary" id="setArrivalTimeBtn" title="현재 시각으로 설정">⏰</button>
                         </div>
                     </div>
@@ -265,8 +290,68 @@
 
         function initializeApp() {
             setCurrentDate();
+            populateTimeSelects();
             setupEventListeners();
             debugLog('앱 초기화 완료');
+        }
+
+        // 24시간제 시(00~23) / 분(00~59) 드롭다운 옵션 생성
+        // 기기·브라우저 로케일(오전/오후 12시간제 등)에 영향받지 않도록
+        // 네이티브 time input 대신 직접 숫자를 선택하게 하여 시간 오기재를 방지한다.
+        function populateTimeSelects() {
+            const hourSelects = [document.getElementById('departureHour'), document.getElementById('arrivalHour')];
+            const minuteSelects = [document.getElementById('departureMinute'), document.getElementById('arrivalMinute')];
+
+            hourSelects.forEach(sel => {
+                sel.innerHTML = '';
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = '시';
+                placeholder.disabled = true;
+                placeholder.selected = true;
+                sel.appendChild(placeholder);
+                for (let h = 0; h < 24; h++) {
+                    const opt = document.createElement('option');
+                    const hh = String(h).padStart(2, '0');
+                    opt.value = hh;
+                    opt.textContent = hh + '시';
+                    sel.appendChild(opt);
+                }
+            });
+
+            minuteSelects.forEach(sel => {
+                sel.innerHTML = '';
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = '분';
+                placeholder.disabled = true;
+                placeholder.selected = true;
+                sel.appendChild(placeholder);
+                for (let m = 0; m < 60; m++) {
+                    const opt = document.createElement('option');
+                    const mm = String(m).padStart(2, '0');
+                    opt.value = mm;
+                    opt.textContent = mm + '분';
+                    sel.appendChild(opt);
+                }
+            });
+        }
+
+        function getTimeValue(prefix) {
+            const h = document.getElementById(prefix + 'Hour').value;
+            const m = document.getElementById(prefix + 'Minute').value;
+            if (h === '' || m === '') return '';
+            return `${h}:${m}`;
+        }
+
+        function setTimeValue(prefix, hh, mm) {
+            document.getElementById(prefix + 'Hour').value = hh;
+            document.getElementById(prefix + 'Minute').value = mm;
+        }
+
+        function clearTimeValue(prefix) {
+            document.getElementById(prefix + 'Hour').value = '';
+            document.getElementById(prefix + 'Minute').value = '';
         }
         
         async function postData(payload) {
@@ -308,23 +393,27 @@
         
         function getCurrentTime() {
             const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0'); // 24시간제 (0~23)
             const minutes = String(now.getMinutes()).padStart(2, '0');
-            return `${hours}:${minutes}`;
+            return { hh: hours, mm: minutes };
         }
 
         function setupEventListeners() {
             document.getElementById('vehicle').addEventListener('change', handleVehicleChange);
             document.getElementById('vehicleLogForm').addEventListener('submit', handleFormSubmit);
             document.getElementById('arrivalKm').addEventListener('input', validateKm);
-            document.getElementById('arrivalTime').addEventListener('change', validateTime);
+            document.getElementById('arrivalHour').addEventListener('change', validateTime);
+            document.getElementById('arrivalMinute').addEventListener('change', validateTime);
             
             document.getElementById('setDepartureTimeBtn').addEventListener('click', () => {
-                document.getElementById('departureTime').value = getCurrentTime();
+                const t = getCurrentTime();
+                setTimeValue('departure', t.hh, t.mm);
             });
             
             document.getElementById('setArrivalTimeBtn').addEventListener('click', () => {
-                document.getElementById('arrivalTime').value = getCurrentTime();
+                const t = getCurrentTime();
+                setTimeValue('arrival', t.hh, t.mm);
+                validateTime();
             });
         }
 
@@ -403,8 +492,8 @@
         }
 
         function validateTime() {
-            const departureTime = document.getElementById('departureTime').value;
-            const arrivalTime = document.getElementById('arrivalTime').value;
+            const departureTime = getTimeValue('departure');
+            const arrivalTime = getTimeValue('arrival');
             
             if (departureTime && arrivalTime && departureTime > arrivalTime) {
                 showWarning('도착시각이 출발시각보다 빠릅니다. 확인해주세요.');
@@ -418,6 +507,17 @@
             
             // 유효성 검사
             if (!validateKm()) return;
+
+            const departureTime = getTimeValue('departure');
+            const arrivalTime = getTimeValue('arrival');
+            if (!departureTime) {
+                showError('출발시각(시/분)을 선택해주세요.');
+                return;
+            }
+            if (!arrivalTime) {
+                showError('도착시각(시/분)을 선택해주세요.');
+                return;
+            }
             validateTime(); // 경고만 표시
             
             const vehicle = document.getElementById('vehicle').value;
@@ -450,8 +550,8 @@
                 destination: destination,
                 purpose: data.purpose,
                 tripDate: data.tripDate,
-                departureTime: data.departureTime,
-                arrivalTime: data.arrivalTime,
+                departureTime: departureTime, // HH:MM, 24시간제
+                arrivalTime: arrivalTime,     // HH:MM, 24시간제
                 departureKm: departureKm,
                 arrivalKm: arrivalKm,
                 distance: arrivalKm - departureKm,
@@ -470,6 +570,8 @@
                 // 폼 초기화 및 다음 입력을 위한 필드 정리
                 document.getElementById('vehicleLogForm').reset();
                 setCurrentDate();
+                clearTimeValue('departure');
+                clearTimeValue('arrival');
                 
                 // 폼 초기화 후 차량 선택 및 KM 필드 재설정
                 document.getElementById('vehicle').value = "";
@@ -514,7 +616,7 @@
                     </div>
                     <div class="saved-data-item">
                         <span class="saved-data-label">⏰ 시간</span>
-                        <span class="saved-data-value">${logData.departureTime} → ${logData.arrivalTime}</span>
+                        <span class="saved-data-value">${logData.departureTime} → ${logData.arrivalTime} (24시간제)</span>
                     </div>
                     <div class="saved-data-item">
                         <span class="saved-data-label">🎯 행선지</span>
@@ -590,4 +692,3 @@
     </script>
 </body>
 </html>
-
